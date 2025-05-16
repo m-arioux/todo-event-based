@@ -1,0 +1,118 @@
+version: "3.9"
+
+services:
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_METADATA_LOG_DIR: /var/lib/kafka/data
+      KAFKA_LOG_DIRS: /var/lib/kafka/logs
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_NODE_ID: "1"
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+    networks:
+      - kafka-network
+
+  ksqldb-server:
+    image: confluentinc/ksqldb-server:latest
+    container_name: ksqldb-server
+    ports:
+      - "8088:8088"
+    environment:
+      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_BOOTSTRAP_SERVERS: kafka:9092
+      KSQL_KSQL_STREAMS_BOOTSTRAP_SERVERS: kafka:9092
+      KSQL_KSQL_STREAMS_APPLICATION_ID: ksql-service
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_REPLICATION: 1
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_MIN_ISR: 1
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_RETENTION_MS: 604800000
+    depends_on:
+      - kafka
+    networks:
+      - kafka-network
+
+  # for debug purposes
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      DYNAMIC_CONFIG_ENABLED: true
+      KAFKA_CLUSTERS_0_NAME: local-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_KSQLDB_SERVER: http://ksqldb-server:8088
+    depends_on:
+      - kafka
+    networks:
+      - kafka-network
+
+  todo-service:
+    container_name: todo-service
+    build:
+      context: ./todo-service
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+      - DOTNET_URLS=http://+:5000
+      - KafkaBootstrapServer=kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - kafka-network
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - kafka-network
+
+  todo-persistent:
+    container_name: todo-persistent
+    build:
+      context: ./todo-persistent
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - MONGO_URI=mongodb://mongodb:27017/chat
+    depends_on:
+      - kafka
+      - mongodb
+    networks:
+      - kafka-network
+
+  todo-spa:
+    build:
+      context: ./todo-spa
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    depends_on:
+      - todo-persistent
+      - todo-service
+    networks:
+      - kafka-network
+
+volumes:
+  mongo-data:
+
+networks:
+  kafka-network:
+    # driver: bridge
