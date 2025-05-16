@@ -1,5 +1,9 @@
 using System.ComponentModel.DataAnnotations;
+using System.Net.ServerSentEvents;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.Channels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using todo_service;
@@ -47,12 +51,20 @@ app.MapPost("/todo", async ([FromServices] TodoProducerService producer, [FromBo
     await producer.SendMessageAsync(todo);
 });
 
-app.MapGet("/todo-live", async (HttpContext context, [FromServices] TodoListeningService eventListeningService, IOptions<JsonOptions> jsonOptions, ILogger<Program> logger, CancellationToken ct) =>
+app.MapGet("/todo-live", async (HttpContext context, [FromServices] TodoListeningService eventListeningService, IOptions<JsonOptions> jsonOptions, ILogger<Program> logger) =>
 {
     context.Response.Headers.Add("Content-Type", "text/event-stream");
     context.Response.Headers.Add("Content-Encoding", "none");
+    context.Response.Headers.Add("Connection", "keep-alive");
 
-    var listenerErrorCt = CancellationTokenSource.CreateLinkedTokenSource(ct);
+    await context.Response.WriteAsync($":\n\n");
+    await context.Response.Body.FlushAsync();
+
+    await context.Response.Body.FlushAsync();
+
+    var cancellationToken = context.RequestAborted;
+
+    var listenerErrorCt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
     var listener = new Listener(async (todo) =>
     {
@@ -60,14 +72,14 @@ app.MapGet("/todo-live", async (HttpContext context, [FromServices] TodoListenin
 
         try
         {
-            await context.Response.WriteAsync($"data: ");
-            await JsonSerializer.SerializeAsync(context.Response.Body, todo, jsonOptions.Value.JsonSerializerOptions);
-            await context.Response.WriteAsync($"\n\n");
+            var json = JsonSerializer.Serialize(todo, jsonOptions.Value.JsonSerializerOptions);
+
+            await context.Response.WriteAsync($"data: {json}\n\n");
             await context.Response.Body.FlushAsync();
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Exception while trying to send SSE");
+            logger.LogError(e, "error while ending SSE");
             listenerErrorCt.Cancel();
         }
 
@@ -75,10 +87,16 @@ app.MapGet("/todo-live", async (HttpContext context, [FromServices] TodoListenin
 
     var unsubscribe = eventListeningService.RegisterListener(listener);
 
-    while (!ct.IsCancellationRequested && !context.RequestAborted.IsCancellationRequested && !listenerErrorCt.IsCancellationRequested)
+    while (!cancellationToken.IsCancellationRequested && !context.RequestAborted.IsCancellationRequested && !listenerErrorCt.IsCancellationRequested)
     {
-        await Task.Delay(1000, ct);
+        await Task.Delay(10000, cancellationToken);
+
+        // sending SSE comment to keep client alive
+        await context.Response.WriteAsync($":\n\n");
+        await context.Response.Body.FlushAsync();
     }
+
+    logger.LogInformation("closed, {mainCt} - {requestAbortedCt} - {listenerErrorCt}", cancellationToken.IsCancellationRequested, context.RequestAborted.IsCancellationRequested, listenerErrorCt.IsCancellationRequested);
 
     unsubscribe();
 });
@@ -92,4 +110,14 @@ public record Todo
     public required string Description { get; set; }
 
     public Guid? Id { get; set; }
+}
+
+public class EventStream<T>
+{
+    private readonly Channel<T> channel = Channel.CreateUnbounded<T>();
+
+    public void OnEventReceived(T value)
+    {
+        channel.Writer.TryWrite(value);
+    }
 }

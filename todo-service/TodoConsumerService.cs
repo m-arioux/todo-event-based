@@ -24,7 +24,7 @@ public class TodoConsumerService(
         {
             BootstrapServers = configuration.Value.KafkaBootstrapServer,
             AutoOffsetReset = AutoOffsetReset.Earliest,
-            GroupId = "group"
+            GroupId = "group",
         };
 
         consumer = new ConsumerBuilder<string, string>(config).Build();

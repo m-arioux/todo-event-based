@@ -41,20 +41,20 @@ services:
       - kafka-network
 
   # for debug purposes
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    ports:
-      - "8080:8080"
-    environment:
-      DYNAMIC_CONFIG_ENABLED: true
-      KAFKA_CLUSTERS_0_NAME: local-cluster
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      KAFKA_CLUSTERS_0_KSQLDB_SERVER: http://ksqldb-server:8088
-    depends_on:
-      - kafka
-    networks:
-      - kafka-network
+  # kafka-ui:
+  #   image: provectuslabs/kafka-ui:latest
+  #   container_name: kafka-ui
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     DYNAMIC_CONFIG_ENABLED: true
+  #     KAFKA_CLUSTERS_0_NAME: local-cluster
+  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+  #     KAFKA_CLUSTERS_0_KSQLDB_SERVER: http://ksqldb-server:8088
+  #   depends_on:
+  #     - kafka
+  #   networks:
+  #     - kafka-network
 
   todo-service:
     container_name: todo-service

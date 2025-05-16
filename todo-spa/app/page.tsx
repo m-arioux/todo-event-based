@@ -23,6 +23,10 @@ export default function Home() {
   useEffect(() => {
     const eventSource = new EventSource("/api/service/todo-live");
 
+    eventSource.addEventListener("error", (e) => {
+      console.error("event source had error", e);
+    });
+
     eventSource.addEventListener("message", (event) => {
       const todo = JSON.parse(event.data) as Todo;
 

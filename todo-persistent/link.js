@@ -15,7 +15,10 @@ export async function kafkaToDatabase() {
     brokers: ["kafka:9092"],
   });
 
-  const consumer = kafka.consumer({ groupId: "todo-persistent" });
+  const consumer = kafka.consumer({
+    groupId: "todo-persistent",
+    readUncommitted: false,
+  });
 
   await consumer.connect();
 
@@ -23,16 +26,20 @@ export async function kafkaToDatabase() {
   await consumer.subscribe({ topic: "todo" });
 
   await consumer.run({
+    autoCommit: false,
     eachMessage: async ({ topic, message }) => {
       console.log("received event", message.value.toString());
 
       if (topic != "todo") {
+        await consumer.commitOffsets();
         return;
       }
 
       const todo = { id: message.key, description: message.value.toString() };
 
-      todos.insertOne(todo);
+      await todos.insertOne(todo);
+
+      await consumer.commitOffsets();
     },
   });
 }
