@@ -3,12 +3,19 @@ using Microsoft.Extensions.Options;
 
 namespace todo_service;
 
-public class EventConsumerService(
-    EventListeningService eventListeningService,
+/// <summary>
+/// This class has the purpose to be a middle-man between the HTTP Responses in Server-Side Events and the Kafka Events.
+/// With this, many consumers (e.g many front-ends) can subscribe to the same Kafka Consumer
+/// </summary>
+/// <param name="eventListeningService"></param>
+/// <param name="configuration"></param>
+/// <param name="logger"></param>
+public class TodoConsumerService(
+    TodoListeningService eventListeningService,
     IOptions<Configuration> configuration,
-    ILogger<EventConsumerService> logger) : BackgroundService
+    ILogger<TodoConsumerService> logger) : BackgroundService
 {
-    private IConsumer<Ignore, string> consumer;
+    private IConsumer<string, string> consumer;
 
 
     private async Task StartConsumerLoop(CancellationToken ct)
@@ -20,7 +27,7 @@ public class EventConsumerService(
             GroupId = "group"
         };
 
-        consumer = new ConsumerBuilder<Ignore, string>(config).Build();
+        consumer = new ConsumerBuilder<string, string>(config).Build();
         consumer.Subscribe("todo");
 
 
@@ -30,7 +37,9 @@ public class EventConsumerService(
             {
                 var cr = consumer.Consume(ct);
 
-                await eventListeningService.Dispatch(cr.Message.Value);
+                var todo = new Todo { Id = Guid.Parse(cr.Message.Key), Description = cr.Message.Value };
+
+                await eventListeningService.Dispatch(todo);
             }
             catch (OperationCanceledException)
             {

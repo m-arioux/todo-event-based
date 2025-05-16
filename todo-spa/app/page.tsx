@@ -1,30 +1,52 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 interface Todo {
   description: string;
+  id: string;
 }
 
 export default function Home() {
   const [todos, setTodos] = useState([] as Todo[]);
+  const [newTodo, setNewTodo] = useState("");
+
+  useEffect(() => {
+    fetch("/api/persistent/todo")
+      .then((response) => response.json())
+      .then((response) => {
+        setTodos((previous) => [...previous, ...response]);
+      });
+  }, []);
 
   useEffect(() => {
     const eventSource = new EventSource("/api/service/todo-live");
 
-    eventSource.onmessage = (event) => {
+    eventSource.addEventListener("message", (event) => {
       const todo = JSON.parse(event.data) as Todo;
 
       console.log("received ", todo);
 
-      setTodos([...todos, todo]);
-    };
+      setTodos((previous) => previous.concat(todo));
+    });
 
     return () => {
       eventSource.close();
     };
   }, []);
+
+  const saveNewTodo = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    fetch("/api/service/todo", {
+      body: JSON.stringify({ description: newTodo }),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }).then(() => {
+      setNewTodo("");
+    });
+  };
 
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
@@ -39,11 +61,26 @@ export default function Home() {
         />
 
         <h2>TODOS:</h2>
-        {todos.map((x) => (
-          <div className="flex gap-4 items-center flex-col sm:flex-row">
-            {x.description}
-          </div>
-        ))}
+        <ul>
+          {todos.map((x) => (
+            <li key={x.id} className="items-center">
+              {x.description}
+            </li>
+          ))}
+        </ul>
+
+        <form onSubmit={saveNewTodo}>
+          <input
+            type="text"
+            value={newTodo}
+            onChange={(e) => setNewTodo(e.target.value)}
+            className="bg-gray-700 text-white"
+            name="new-todo"
+          ></input>
+          <button type="submit" className="bg-green-800">
+            Send
+          </button>
+        </form>
       </main>
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
         <a

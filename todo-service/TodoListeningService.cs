@@ -1,6 +1,6 @@
 namespace todo_service;
 
-public class EventListeningService(ILogger<EventListeningService> logger)
+public class TodoListeningService(ILogger<TodoListeningService> logger)
 {
     private readonly List<Listener> listeners = [];
 
@@ -15,12 +15,12 @@ public class EventListeningService(ILogger<EventListeningService> logger)
         };
     }
 
-    public async Task Dispatch(string value)
+    public async Task Dispatch(Todo todo)
     {
         var tasks = listeners.Select(x =>
         {
-            logger.LogInformation("Sending event {event} to a listener", value);
-            return x.Callback(value);
+            logger.LogInformation("Sending todo {todo} to a listener", todo);
+            return x.Callback(todo);
         });
 
         await Task.WhenAll(tasks);
@@ -28,4 +28,4 @@ public class EventListeningService(ILogger<EventListeningService> logger)
 }
 
 
-public record Listener(Func<string, Task> Callback);
+public record Listener(Func<Todo, Task> Callback);

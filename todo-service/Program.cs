@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using todo_service;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,9 +17,11 @@ builder.Services.AddOptions<Configuration>()
     .ValidateOnStart()
     .ValidateDataAnnotations();
 
-builder.Services.AddSingleton<EventProducerService>();
-builder.Services.AddHostedService<EventConsumerService>();
-builder.Services.AddSingleton<EventListeningService>();
+builder.Services.AddSingleton<TodoProducerService>();
+builder.Services.AddHostedService<TodoConsumerService>();
+builder.Services.AddSingleton<TodoListeningService>();
+
+// builder.Services.ConfigureHttpJsonOptions(x => x.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
 
 var app = builder.Build();
 
@@ -32,26 +35,33 @@ if (app.Environment.IsDevelopment())
 
 app.MapGet("/", () => "Hello World from todo-service");
 
-app.MapPost("/todo", async ([FromServices] EventProducerService producer, [FromBody] Todo todo) =>
+app.MapPost("/todo", async ([FromServices] TodoProducerService producer, [FromBody] Todo todo) =>
 {
-    await producer.SendMessageAsync(todo.Description);
+    if (todo is null)
+    {
+        return;
+    }
+
+    todo.Id = Guid.NewGuid();
+
+    await producer.SendMessageAsync(todo);
 });
 
-app.MapGet("/todo-live", async (HttpContext context, [FromServices] EventListeningService eventListeningService, ILogger<Program> logger, CancellationToken ct) =>
+app.MapGet("/todo-live", async (HttpContext context, [FromServices] TodoListeningService eventListeningService, IOptions<JsonOptions> jsonOptions, ILogger<Program> logger, CancellationToken ct) =>
 {
     context.Response.Headers.Add("Content-Type", "text/event-stream");
     context.Response.Headers.Add("Content-Encoding", "none");
 
     var listenerErrorCt = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-    var listener = new Listener(async (value) =>
+    var listener = new Listener(async (todo) =>
     {
-        logger.LogInformation("Sending back as SSE {event}", value);
+        logger.LogInformation("Sending back as SSE {event}", todo);
 
         try
         {
             await context.Response.WriteAsync($"data: ");
-            await JsonSerializer.SerializeAsync(context.Response.Body, new Todo { Description = value });
+            await JsonSerializer.SerializeAsync(context.Response.Body, todo, jsonOptions.Value.JsonSerializerOptions);
             await context.Response.WriteAsync($"\n\n");
             await context.Response.Body.FlushAsync();
         }
@@ -76,8 +86,10 @@ app.MapGet("/todo-live", async (HttpContext context, [FromServices] EventListeni
 app.Run();
 
 
-record Todo
+public record Todo
 {
     [Required(AllowEmptyStrings = false)]
     public required string Description { get; set; }
+
+    public Guid? Id { get; set; }
 }
