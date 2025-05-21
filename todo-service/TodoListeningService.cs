@@ -10,7 +10,7 @@ public class TodoListeningService(ILogger<TodoListeningService> logger)
 
         return () =>
         {
-            logger.LogInformation("Removing a listener");
+            logger.LogTrace("Removing a listener");
             listeners.Remove(listener);
         };
     }
@@ -19,7 +19,7 @@ public class TodoListeningService(ILogger<TodoListeningService> logger)
     {
         var tasks = listeners.Select(x =>
         {
-            logger.LogInformation("Sending todo {todo} to a listener", todo);
+            logger.LogTrace("Sending todo {todo} to a listener", todo);
             return x.Callback(todo);
         });
 

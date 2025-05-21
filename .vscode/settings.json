@@ -1,0 +1,4 @@
+{
+  "cucumber.features": ["todo-test/tests/**/*.feature"],
+  "cucumber.glue": ["todo-test/tests/**/*.js"]
+}

@@ -57,21 +57,29 @@ app.MapGet("/todo-live", async (HttpContext context, [FromServices] TodoListenin
     context.Response.Headers.Add("Content-Encoding", "none");
     context.Response.Headers.Add("Connection", "keep-alive");
 
+    var clientId = context.Request.Headers.Origin.FirstOrDefault() + " / " + context.Request.Headers.UserAgent.FirstOrDefault();
+
     await context.Response.WriteAsync($":\n\n");
     await context.Response.Body.FlushAsync();
 
     await context.Response.Body.FlushAsync();
 
-    var cancellationToken = context.RequestAborted;
-
-    var listenerErrorCt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+    var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+    var cancellationToken = cancellationTokenSource.Token;
 
     var listener = new Listener(async (todo) =>
     {
-        logger.LogInformation("Sending back as SSE {event}", todo);
+        logger.LogTrace("Sending back as SSE {event} to {id}", todo, clientId);
 
         try
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                logger.LogTrace("Tried to send SSE event but the request was cancelled - {id}", clientId);
+
+                return;
+            }
+
             var json = JsonSerializer.Serialize(todo, jsonOptions.Value.JsonSerializerOptions);
 
             await context.Response.WriteAsync($"data: {json}\n\n");
@@ -79,24 +87,25 @@ app.MapGet("/todo-live", async (HttpContext context, [FromServices] TodoListenin
         }
         catch (Exception e)
         {
-            logger.LogError(e, "error while ending SSE");
-            listenerErrorCt.Cancel();
+            logger.LogError(e, "error while ending SSE to {id}", clientId);
+            cancellationTokenSource.Cancel();
         }
 
     });
 
     var unsubscribe = eventListeningService.RegisterListener(listener);
 
-    while (!cancellationToken.IsCancellationRequested && !context.RequestAborted.IsCancellationRequested && !listenerErrorCt.IsCancellationRequested)
+    while (!cancellationToken.IsCancellationRequested)
     {
-        await Task.Delay(10000, cancellationToken);
-
+        logger.LogTrace("Sending keep-alive to {id}", clientId);
         // sending SSE comment to keep client alive
         await context.Response.WriteAsync($":\n\n");
         await context.Response.Body.FlushAsync();
+
+        await Task.Delay(10000);
     }
 
-    logger.LogInformation("closed, {mainCt} - {requestAbortedCt} - {listenerErrorCt}", cancellationToken.IsCancellationRequested, context.RequestAborted.IsCancellationRequested, listenerErrorCt.IsCancellationRequested);
+    logger.LogTrace("closed connection to {id} - {cancelled}", clientId, cancellationToken.IsCancellationRequested);
 
     unsubscribe();
 });

@@ -1,0 +1,10 @@
+{
+  "default": {
+    "formatOptions": {
+      "snippetInterface": "synchronous"
+    },
+    "require": ["tests/steps/**/*.js"],
+    "paths": ["tests/features/**/*.feature"],
+    "publishQuiet": true
+  }
+}

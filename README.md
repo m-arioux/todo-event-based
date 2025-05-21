@@ -53,7 +53,10 @@ GET /todo is the only endpoint. It gives all the todos saved into the MongoDB da
 
 It consumes all the todos from the topic and saves them in the database.
 
+## todo-test
+
+Some e2e tests using cucumber.js and playwright. You can run them by firstly installing dependencies with `npm i` and then `npm run test`
+
 # Known issues
 
-Sessions are never closed in todo-service.
-If the connection gets closed, the service continues to try to send SSE when there is a new todo.
+There's a flaky test.
