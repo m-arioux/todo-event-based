@@ -1,7 +1,7 @@
 # todo-event-based
 
 A simple todo app using Apache Kafka with React, .NET, Express, MongoDB.
-The purpose for making this is to get practical experience with Kafka and Docker/Podman.
+The purpose for making this is to get practical experience with Kafka, Docker/Podman, Cucumber (Gherkin) and Playwright.
 
 # Getting Started
 
