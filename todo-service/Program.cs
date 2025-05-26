@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -24,6 +23,8 @@ builder.Services.AddOptions<Configuration>()
 builder.Services.AddSingleton<TodoProducerService>();
 builder.Services.AddHostedService<TodoConsumerService>();
 builder.Services.AddSingleton<TodoListeningService>();
+
+builder.Services.AddObservability(builder.Configuration);
 
 // builder.Services.ConfigureHttpJsonOptions(x => x.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
 
@@ -110,23 +111,6 @@ app.MapGet("/todo-live", async (HttpContext context, [FromServices] TodoListenin
     unsubscribe();
 });
 
+app.MapObservability();
+
 app.Run();
-
-
-public record Todo
-{
-    [Required(AllowEmptyStrings = false)]
-    public required string Description { get; set; }
-
-    public Guid? Id { get; set; }
-}
-
-public class EventStream<T>
-{
-    private readonly Channel<T> channel = Channel.CreateUnbounded<T>();
-
-    public void OnEventReceived(T value)
-    {
-        channel.Writer.TryWrite(value);
-    }
-}

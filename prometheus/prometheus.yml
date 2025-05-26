@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 1s
+
+scrape_configs:
+  - job_name: "todo-service"
+    static_configs:
+      - targets: ["todo-service:5000"]
+  - job_name: "todo-spa"
+    static_configs:
+      - targets: ["todo-spa:9464"]
+  - job_name: "todo-persistent"
+    static_configs:
+      - targets: ["todo-persistent:3000"]
+  - job_name: "monbodb"
+    static_configs:
+      - targets: ["mongodb-exporter:9216"]
+  - job_name: "kafka"
+    static_configs:
+      - targets: ["kafka:7071"]

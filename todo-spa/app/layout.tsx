@@ -2,6 +2,13 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+if (typeof window === "undefined") {
+  console.warn("server-side");
+  import("../telemetry").then();
+} else {
+  console.warn("client-side");
+}
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

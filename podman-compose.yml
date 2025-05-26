@@ -2,10 +2,13 @@ version: "3.9"
 
 services:
   kafka:
-    image: apache/kafka:latest
+    build:
+      context: ./kafka
+      dockerfile: Dockerfile
     container_name: kafka
     ports:
       - "9092:9092"
+      - "7071:7071" # prometheus
     environment:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
@@ -19,42 +22,10 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_NODE_ID: "1"
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      EXTRA_ARGS: -javaagent:/usr/app/jmx_prometheus_javaagent.jar=7071:/usr/app/prom-jmx-agent-config.yml
     networks:
       - kafka-network
-
-  ksqldb-server:
-    image: confluentinc/ksqldb-server:latest
-    container_name: ksqldb-server
-    ports:
-      - "8088:8088"
-    environment:
-      KSQL_LISTENERS: http://0.0.0.0:8088
-      KSQL_BOOTSTRAP_SERVERS: kafka:9092
-      KSQL_KSQL_STREAMS_BOOTSTRAP_SERVERS: kafka:9092
-      KSQL_KSQL_STREAMS_APPLICATION_ID: ksql-service
-      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_REPLICATION: 1
-      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_MIN_ISR: 1
-      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_RETENTION_MS: 604800000
-    depends_on:
-      - kafka
-    networks:
-      - kafka-network
-
-  # for debug purposes
-  # kafka-ui:
-  #   image: provectuslabs/kafka-ui:latest
-  #   container_name: kafka-ui
-  #   ports:
-  #     - "8080:8080"
-  #   environment:
-  #     DYNAMIC_CONFIG_ENABLED: true
-  #     KAFKA_CLUSTERS_0_NAME: local-cluster
-  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-  #     KAFKA_CLUSTERS_0_KSQLDB_SERVER: http://ksqldb-server:8088
-  #   depends_on:
-  #     - kafka
-  #   networks:
-  #     - kafka-network
 
   todo-service:
     container_name: todo-service
@@ -68,8 +39,10 @@ services:
       - ASPNETCORE_URLS=http://+:5000
       - DOTNET_URLS=http://+:5000
       - KafkaBootstrapServer=kafka:9092
+      - ZIPKIN_URL=http://zipkin:9411
     depends_on:
       - kafka
+      - zipkin
     networks:
       - kafka-network
 
@@ -85,6 +58,19 @@ services:
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
       - kafka-network
+
+  mongodb-exporter:
+    container_name: mongodb-exporter
+    image: bitnami/mongodb-exporter
+    restart: always
+    ports:
+      - 8880:9216
+    networks:
+      - kafka-network
+    environment:
+      MONGODB_URI: mongodb://prometheus:9081u43981eh@mongodb:27017
+    depends_on:
+      - mongodb
 
   todo-persistent:
     container_name: todo-persistent
@@ -108,9 +94,47 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3001:3000"
+      - "9464:9464" # prometheus
     depends_on:
       - todo-persistent
       - todo-service
+    networks:
+      - kafka-network
+
+  # observability
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    volumes:
+      - ./prometheus:/etc/prometheus
+    networks:
+      - kafka-network
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3333:3000
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=grafana
+    volumes:
+      - ./grafana/datasource:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - kafka-network
+
+  zipkin:
+    image: openzipkin/zipkin
+    ports:
+      - 9411:9411
     networks:
       - kafka-network
 
@@ -119,4 +143,3 @@ volumes:
 
 networks:
   kafka-network:
-    # driver: bridge

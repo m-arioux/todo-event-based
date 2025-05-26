@@ -1,4 +1,5 @@
 using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using Microsoft.Extensions.Options;
 
 namespace todo_service;
@@ -35,11 +36,12 @@ public class TodoConsumerService(
         {
             try
             {
-                var cr = consumer.Consume(ct);
+                await consumer.ConsumeWithInstrumentation(async (cr, _) =>
+                {
+                    var todo = new Todo { Id = Guid.Parse(cr.Message.Key), Description = cr.Message.Value };
 
-                var todo = new Todo { Id = Guid.Parse(cr.Message.Key), Description = cr.Message.Value };
-
-                await eventListeningService.Dispatch(todo);
+                    await eventListeningService.Dispatch(todo);
+                }, ct);
             }
             catch (OperationCanceledException)
             {
