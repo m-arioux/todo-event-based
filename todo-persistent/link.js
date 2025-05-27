@@ -1,5 +1,6 @@
 import { Kafka } from "kafkajs";
 import { MongoClient } from "mongodb";
+import instrumentKafkaJs from "zipkin-instrumentation-kafkajs";
 
 const mongoClient = new MongoClient(
   "mongodb://root:password@mongodb/main?authMechanism=SCRAM-SHA-1&authSource=admin"
@@ -9,11 +10,14 @@ const db = mongoClient.db("main");
 
 const todos = db.collection("todo");
 
-export async function kafkaToDatabase() {
-  const kafka = new Kafka({
-    clientId: "todo-persistent",
-    brokers: ["kafka:9092"],
-  });
+export async function kafkaToDatabase(tracer) {
+  const kafka = instrumentKafkaJs(
+    new Kafka({
+      clientId: "todo-persistent",
+      brokers: ["kafka:9092"],
+    }),
+    { tracer, remoteServiceName }
+  );
 
   const consumer = kafka.consumer({
     groupId: "todo-persistent",

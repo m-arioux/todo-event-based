@@ -23,7 +23,16 @@ services:
       KAFKA_NODE_ID: "1"
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_ADVERTISED_HOST_NAME: kafka
-      EXTRA_ARGS: -javaagent:/usr/app/jmx_prometheus_javaagent.jar=7071:/usr/app/prom-jmx-agent-config.yml
+      KAFKA_OPTS: -javaagent:/usr/app/jmx_prometheus_javaagent.jar=7071:/usr/app/prom-jmx-agent-config.yml
+    networks:
+      - kafka-network
+
+  kafka-cli:
+    image: frser/kafka-cli
+    environment:
+      BOOTSTRAP_SERVER: kafka:9092
+      CREATE_TOPICS: >
+        todo:1:1
     networks:
       - kafka-network
 
@@ -53,6 +62,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: password
+    command: ["mongod", "--bind_ip", "0.0.0.0"]
     volumes:
       - mongo-data:/data/db
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
@@ -64,7 +74,7 @@ services:
     image: bitnami/mongodb-exporter
     restart: always
     ports:
-      - 8880:9216
+      - 9216:9216
     networks:
       - kafka-network
     environment:
@@ -81,7 +91,6 @@ services:
       - "3000:3000"
     environment:
       - KAFKA_BROKER=kafka:9092
-      - MONGO_URI=mongodb://mongodb:27017/chat
     depends_on:
       - kafka
       - mongodb
