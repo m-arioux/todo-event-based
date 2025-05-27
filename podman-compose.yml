@@ -109,6 +109,8 @@ services:
       - todo-service
     networks:
       - kafka-network
+    environment:
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
 
   # observability
   prometheus:
