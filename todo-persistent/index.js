@@ -1,15 +1,9 @@
 import express from "express";
 import { fetchFromDatabase, kafkaToDatabase } from "./link.js";
 import promMid from "express-prometheus-middleware";
-const {
-  Tracer,
-  ExplicitContext,
-  BatchRecorder,
-  jsonEncoder,
-} = require("zipkin");
-const { HttpLogger } = require("zipkin-transport-http");
-const zipkinMiddleware =
-  require("zipkin-instrumentation-express").expressMiddleware;
+import { Tracer, ExplicitContext, BatchRecorder, jsonEncoder } from "zipkin";
+import { HttpLogger } from "zipkin-transport-http";
+import { expressMiddleware as zipkinMiddleware } from "zipkin-instrumentation-express";
 
 const ZIPKIN_ENDPOINT = process.env.ZIPKIN_ENDPOINT;
 
@@ -25,10 +19,10 @@ const tracer = new Tracer({
       jsonEncoder: jsonEncoder.JSON_V2,
     }),
   }),
-  localServiceName: "date-service",
+  localServiceName: "todo-persistent",
 });
 
-await kafkaToDatabase();
+await kafkaToDatabase(tracer);
 
 const app = express();
 

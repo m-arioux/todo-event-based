@@ -16,7 +16,7 @@ export async function kafkaToDatabase(tracer) {
       clientId: "todo-persistent",
       brokers: ["kafka:9092"],
     }),
-    { tracer, remoteServiceName }
+    { tracer, remoteServiceName: "kafka" }
   );
 
   const consumer = kafka.consumer({
@@ -26,7 +26,6 @@ export async function kafkaToDatabase(tracer) {
 
   await consumer.connect();
 
-  // TODO: add index to save last handled todo
   await consumer.subscribe({ topic: "todo" });
 
   await consumer.run({

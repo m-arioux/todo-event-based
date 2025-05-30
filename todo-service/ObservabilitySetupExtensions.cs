@@ -41,7 +41,11 @@ public static class ObservabilitySetupExtensions
             .WithTracing(tracing =>
             {
                 tracing.SetResourceBuilder(resource)
-                        .AddAspNetCoreInstrumentation()
+                        .AddAspNetCoreInstrumentation(x =>
+                        {
+                            x.EnableAspNetCoreSignalRSupport = true;
+                            x.Filter = (request) => !request.Request.Path.Equals("/metrics");
+                        })
                         .AddHttpClientInstrumentation()
                         .AddConfluentKafkaInstrumentation()
                         .AddZipkinExporter(zipkin =>

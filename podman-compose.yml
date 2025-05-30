@@ -91,6 +91,7 @@ services:
       - "3000:3000"
     environment:
       - KAFKA_BROKER=kafka:9092
+      - ZIPKIN_ENDPOINT=http://zipkin:9411
     depends_on:
       - kafka
       - mongodb

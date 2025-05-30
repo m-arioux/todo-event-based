@@ -1,4 +1,5 @@
 using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using Microsoft.Extensions.Options;
 
 namespace todo_service;
@@ -16,7 +17,7 @@ public class TodoProducerService : IDisposable
             BootstrapServers = configuration.Value.KafkaBootstrapServer
         };
 
-        producer = new ProducerBuilder<string, string>(producerConfig).Build();
+        producer = new ProducerBuilder<string, string>(producerConfig).BuildWithInstrumentation();
     }
 
     public void Dispose()
